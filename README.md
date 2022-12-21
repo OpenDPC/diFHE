@@ -10,3 +10,6 @@ diFHE support diAPP, enOS and erOS
 3. FHEW  
 4. THFE  
 5. CKKS  
+
+# ref
+1. [FHE survey](./FHE%20survey.pdf)
