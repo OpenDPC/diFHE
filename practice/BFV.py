@@ -229,6 +229,110 @@ def mult_ct(ct1, ct2):
     return [c0, c1, c2]
 
 
+def relin_v1_key_gen(s):
+    """
+    重线性化 version1 生成rlk（重线性化密钥）
+    rlki0 + rlki1·s = T^i·s^2 - e_i
+    :param s: 加密算法的私钥
+    :return: 重线性化密钥
+    """
+    rlk = []
+    s2 = poly_mult(s, s, q)
+    for i in range(l + 1):
+        ei = sample()
+        ai = []
+        for j in range(d):
+            ai.append(int(np_random.randint(-(q - 1) // 2, q // 2)))
+
+        rlki0 = poly_add(
+            poly_mult_const(poly_add(poly_mult(ai, s, q), ei, q), -1, q),
+            poly_mult_const(s2, pow(T, i), q),
+            q,
+        )
+        rlk.append([rlki0, ai])
+    return rlk
+
+
+def relin_v1(ct, rlk):
+    """
+    重线性化 version1
+    :param ct: 待运算的密文
+    :param rlk: 重线性化密钥
+    :return: 重线性化后的密文
+    """
+    c0 = ct[0]
+    c1 = ct[1]
+    c2 = ct[2]
+    # 对c2进行T进制分解
+    c2T = []
+    c2_tmp = list(c2)
+    for i in range(l + 1):
+        c2i = []
+        for j in range(d):
+            if c2_tmp[j] >= 0:
+                c2i.append(c2_tmp[j] % T)
+            else:
+                c2i.append(-(-c2_tmp[j]) % T)
+            c2_tmp[j] //= T
+        c2T.append(c2i)
+
+    sum0 = [0 for _ in range(d)]
+    for i in range(l + 1):
+        sum0 = poly_add(sum0, poly_mult(rlk[i][0], c2T[i], q), q)
+    c0_ = poly_add(c0, sum0, q)
+
+    sum1 = [0 for _ in range(d)]
+    for i in range(l + 1):
+        sum1 = poly_add(sum1, poly_mult(rlk[i][1], c2T[i], q), q)
+    c1_ = poly_add(c1, sum1, q)
+    return [c0_, c1_]
+
+
+# 重线性化 version2 生成rlk
+def relin_v2_key_gen(s):
+    """
+    重线性化 version2 生成rlk（重线性化密钥）
+    rlk0 + rlk1·s = p·s^2 - e
+    :param s: 加密算法的私钥
+    :return: 重线性化密钥
+    """
+    a = []
+    for i in range(d):
+        a.append(random.randint(-(p * q - 1) // 2, p * q // 2))
+    e = sample(20)
+    s2 = poly_mult(s, s, p * q)
+    rlk0 = poly_add(
+        poly_mult_const(poly_add(poly_mult(a, s, p * q), e, p * q), -1, p * q),
+        poly_mult_const(s2, p, p * q),
+        p * q,
+    )
+    return [rlk0, a]
+
+
+def relin_v2(ct, rlk):
+    """
+    重线性化 version2
+    :param ct: 待运算的密文
+    :param rlk: 重线性化密钥
+    :return: 重线性化后的密文
+    """
+    c0 = ct[0]
+    c1 = ct[1]
+    c2 = ct[2]
+
+    c20 = poly_mult(c2, rlk[0], 0)
+    for i in range(d):
+        c20[i] = round(c20[i] / p) % q
+
+    c21 = poly_mult(c2, rlk[1], 0)
+    for i in range(d):
+        c21[i] = round(c21[i] / p) % q
+
+    c0_ = poly_add(c0, c20, q)
+    c1_ = poly_add(c1, c21, q)
+    return [c0_, c1_]
+
+
 def decrypt_HE_mult(sk, ct):
     """
     不使用重线性化技术，直接对生成的三个密文进行解密
@@ -279,6 +383,18 @@ def main():
     ct_mult = mult_ct(ct3, ct4)
     plaintext_poly = decrypt_HE_mult(sk, ct_mult)
     print("乘法解密：  ", plaintext_poly)
+
+    # 重线性化v1
+    rlk1 = relin_v1_key_gen(sk)
+    ct_relin1 = relin_v1(ct_mult, rlk1)
+    plaintext_poly = decrypt(sk, ct_relin1)
+    print("重线性化v1：", plaintext_poly)
+
+    # 重线性化v2
+    rlk2 = relin_v2_key_gen(sk)
+    ct_relin2 = relin_v2(ct_mult, rlk2)
+    plaintext_poly = decrypt(sk, ct_relin2)
+    print("重线性化v2：", plaintext_poly)
 
 
 if __name__ == "__main__":
