@@ -1,6 +1,6 @@
 * [中文版](./README_CN.md)
 
-# enOS
+# diFHE
 diFHE is a Decentralized homomorphic encryption algorithm library for IoT  
 diFHE support diAPP, enOS and erOS
 
